@@ -17,6 +17,7 @@
 #include <optional>
 #include <string>
 #include <type_traits>
+#include <unordered_map>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -98,11 +99,43 @@ public:
     {
       std::unique_lock lock(mutex_);
       container_.set(name, variant(value));
+      // An explicit property_set() always wins over a prior binding for the
+      // same name (SRS-003 REQ-5.1.8's "last write wins" contract) - a
+      // stale reference sitting alongside a fresher literal value would be
+      // a correctness trap, so the binding is dropped, not merely shadowed.
+      bindings_.erase(name);
     }
-    // Emitted after the lock is released (see signal.hpp), so a
-    // slot that calls property_set()/property_get() again on this same
-    // object cannot deadlock against the mutation it is reacting to.
     property_changed.emit(name);
+  }
+
+  // Ties `name` to another object's `source_property`, so a later
+  // property_get() on `name` transparently follows the reference and
+  // returns *that* object's current value instead of anything stored
+  // locally - "live" for free, since every existing property_get() call
+  // site (every element that reads a property once per buffer/frame, e.g.
+  // volume::level(), spectrascope::fft_size()) already re-reads on its own
+  // schedule; no separate tick/update mechanism is needed (SRS-017
+  // REQ-17.1.2/OPEN-17.3's motivating case). Overwrites any existing
+  // binding or literal value already stored under `name` - the same
+  // "last write wins" contract property_set() itself follows. Does not
+  // fire property_changed (no new *value* is known yet - the reference
+  // exists, but resolving it happens lazily at property_get() time, and
+  // this object cannot observe the source's own property_changed without
+  // establishing a signal connection this SRS deliberately does not add,
+  // per REQ-5.1.9).
+  void property_bind(const std::string &name, std::weak_ptr<const object> source,
+                      const std::string &source_property) {
+    std::unique_lock lock(mutex_);
+    bindings_[name] = binding{std::move(source), source_property};
+    container_.erase(name);
+  }
+
+  // True if `name` currently resolves through a live reference rather than
+  // a locally-stored value - regardless of whether that reference is
+  // still resolvable (the source object may since have been destroyed).
+  bool is_bound(const std::string &name) const {
+    std::unique_lock lock(mutex_);
+    return bindings_.contains(name);
   }
 
   // std::nullopt when name is absent. Throws std::bad_variant_access (the
@@ -166,9 +199,30 @@ public:
   // alternative ahead of time (e.g. structure::get(), §5.4, whose field
   // values were never scalar-typed to begin with - the original
   // structure::field_value was itself a small variant).
+  // A bound name (property_bind()) is resolved here, and only here -
+  // property_get<ValueType>() above calls this and then applies its own
+  // int64/uint64/double coercion to whatever variant comes back, so a
+  // binding gets that same coercion for free with no changes needed on
+  // property_get<ValueType>()'s own side. An expired source (the
+  // referenced object has since been destroyed) resolves to std::nullopt,
+  // the same as any other absent key - not a thrown exception, since a
+  // dangling reference from a source outliving the target's needs is an
+  // ordinary lifecycle event in a pipeline (an upstream element torn down
+  // before a downstream one), not a programming error.
   std::optional<variant> property_get_variant(const std::string &name) const {
-    std::unique_lock lock(mutex_);
-    return container_.get(name);
+    binding bound;
+    {
+      std::unique_lock lock(mutex_);
+      if (auto it = bindings_.find(name); it != bindings_.end()) {
+        bound = it->second;
+      } else {
+        return container_.get(name);
+      }
+    }
+    if (auto source = bound.source.lock()) {
+      return source->property_get_variant(bound.source_property);
+    }
+    return std::nullopt;
   }
 
   // A thread-safe forward iterator: begin() takes the lock exactly once,
@@ -242,8 +296,19 @@ public:
   iterator end() const { return iterator(); }
 
 private:
+  struct binding {
+    std::weak_ptr<const object> source;
+    std::string source_property;
+  };
+
   mutable std::recursive_mutex mutex_;
   map container_;
+  // Deliberately not copied/moved by object(const object&)/object(object&&)
+  // above - neither constructor's body mentions bindings_, so it default-
+  // constructs empty for a copy, consistent with property_changed's own
+  // "a copy starts with no observers of its own" independent-identity
+  // design (this class's own header comment, above).
+  std::unordered_map<std::string, binding> bindings_;
 };
 
 } // namespace cx::core

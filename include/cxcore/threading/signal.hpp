@@ -161,6 +161,8 @@ public:
     return control_->sinks.size();
   }
 
+  std::vector<slot_type> connected_slots() const { return snapshot_sinks(); }
+
 private:
   std::vector<slot_type> snapshot_sinks() const {
     std::unique_lock lock(control_->mutex);

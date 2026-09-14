@@ -10,14 +10,19 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <condition_variable>
 #include <cstddef>
 #include <functional>
 #include <iostream>
+#include <memory>
 #include <mutex>
 #include <queue>
+#include <string_view>
 #include <thread>
 #include <vector>
+
+#include <cxcore/threading/async_executor.hpp>
 
 namespace cx::core {
 
@@ -26,14 +31,12 @@ namespace cx::core {
 // not weighted fair queuing (SRS-007 §7.1) - so e.g. logging (low) can never
 // delay media events (normal) queued behind it. `normal` is the default and
 // matches today's single-queue FIFO behavior exactly.
-enum class task_priority { high = 0, normal = 1, low = 2 };
-
 // General-purpose pool for short-lived, fire-and-forget work (e.g. explicit
 // signal::emit_async submissions). Long-running/repeating loops (pad
 // streaming threads) must use task instead - submitting a repeating loop
 // here would starve the pool for everyone else, since it is a fixed-size
 // worker set.
-class thread_pool {
+class thread_pool : public async_executor {
 public:
   using task_type = std::function<void()>;
 
@@ -44,33 +47,65 @@ public:
   thread_pool(thread_pool &&) = delete;
   thread_pool &operator=(thread_pool &&) = delete;
 
-  ~thread_pool() = default;
+  ~thread_pool() override { stop(); }
 
   void submit(task_type task, task_priority priority = task_priority::normal);
 
   static thread_pool &instance();
+
+  static std::shared_ptr<thread_pool>
+  create(unsigned worker_count = std::thread::hardware_concurrency()) {
+    return std::make_shared<thread_pool>(worker_count);
+  }
+  static std::shared_ptr<thread_pool> default_instance() {
+    static auto pool = create();
+    return pool;
+  }
+
+  void defer(async_executor::task fn) override { submit(std::move(fn)); }
+  void offload(async_executor::task fn, task_priority priority) override {
+    submit(std::move(fn), priority);
+  }
+  void start() override;
+  void stop() override;
+  bool running() const override { return running_.load(); }
+  std::string_view name() const noexcept override { return "thread_pool"; }
+  concurrency model() const noexcept override { return concurrency::concurrent; }
 
 private:
   void worker_loop(std::stop_token stop_token);
   bool has_pending() const;
   task_type dequeue_highest();
 
+  unsigned worker_count_;
+  std::atomic<bool> running_{false};
   std::mutex mutex_;
   std::condition_variable_any queue_cond_;
   std::array<std::queue<task_type>, 3> queues_;
   std::vector<std::jthread> workers_;
 };
 
-inline thread_pool::thread_pool(unsigned worker_count) {
+inline thread_pool::thread_pool(unsigned worker_count)
+    : worker_count_(std::max(1u, worker_count)) {
   // hardware_concurrency() may legitimately return 0 (unspecified per the
   // standard on some platforms/containers); a zero-worker pool would accept
   // submissions forever without ever running them.
-  worker_count = std::max(1u, worker_count);
+  start();
+}
 
-  workers_.reserve(worker_count);
-  for (unsigned i = 0; i < worker_count; ++i) {
+inline void thread_pool::start() {
+  if (running_.exchange(true)) return;
+  workers_.reserve(worker_count_);
+  for (unsigned i = 0; i < worker_count_; ++i) {
     workers_.emplace_back([this](std::stop_token stop_token) { worker_loop(stop_token); });
   }
+}
+
+inline void thread_pool::stop() {
+  if (!running_.exchange(false)) return;
+  for (auto &worker : workers_) worker.request_stop();
+  queue_cond_.notify_all();
+  workers_.clear();
 }
 
 inline void thread_pool::submit(task_type task, task_priority priority) {
