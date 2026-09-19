@@ -117,3 +117,13 @@ if(CXCORE_BUILD_TESTS)
   enable_testing()
   add_test(NAME ${PROJECT_NAME}-tests COMMAND ${PROJECT_NAME}-tests)
 endif()
+
+# Dispatch benchmarks: every cx-core asynchronous-call and event mechanism
+# against its STL-only equivalent. Always optimized, whatever the tree's build
+# type - an unoptimized std::function call measures the compiler, not cx-core.
+option(CXCORE_BUILD_BENCHMARKS "Build cxcore's dispatch benchmarks" OFF)
+if(CXCORE_BUILD_BENCHMARKS)
+  add_executable(cx-core-benchmark-dispatch benchmarks/cx-core-benchmark-dispatch.cpp)
+  target_link_libraries(cx-core-benchmark-dispatch PRIVATE ${PROJECT_NAME})
+  target_compile_options(cx-core-benchmark-dispatch PRIVATE -O2 -DNDEBUG)
+endif()
