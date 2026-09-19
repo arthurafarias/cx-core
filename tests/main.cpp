@@ -6,6 +6,6 @@
 // permission of the copyright holder.
 // ---------------------------------------------------------------------------
 
-#include <cxcore/testing/run_all.hpp>
+#include <cx/core/testing/run_all.hpp>
 
 int main(int argc, char **argv) { return cx::core::testing::run_all(argc, argv); }

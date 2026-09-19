@@ -1,7 +1,12 @@
 #pragma once
 
+// Pre-split path, kept so existing consumers keep compiling: forwards to
+// <cx/core/threading/task_priority.hpp>.
+
+#include <cx/core/threading/task_priority.hpp>
+
 namespace cx::core {
 
-enum class task_priority { high = 0, normal = 1, low = 2 };
+using threading::task_priority;
 
 } // namespace cx::core

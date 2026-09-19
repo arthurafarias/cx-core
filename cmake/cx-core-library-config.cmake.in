@@ -1,0 +1,6 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+@CX_CORE_LIBRARY_FIND_DEPENDENCIES@
+include("${CMAKE_CURRENT_LIST_DIR}/@CX_CORE_LIBRARY_NAME@Targets.cmake")
+check_required_components(@CX_CORE_LIBRARY_NAME@)

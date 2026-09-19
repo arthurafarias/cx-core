@@ -8,8 +8,8 @@
 
 #pragma once
 
-#include <cxcore/testing/test_group.hpp>
-#include <cxcore/threading/thread_pool.hpp>
+#include <cx/core/testing/test_group.hpp>
+#include <cx/core/threading/thread_pool.hpp>
 
 #include <atomic>
 #include <chrono>
@@ -26,7 +26,7 @@ namespace cx::core::testing {
 struct thread_pool_test : public test_group {
   thread_pool_test() : test_group("thread_pool", {
     {"submit() executes the task asynchronously", [](test_context &ctx) {
-      cx::core::thread_pool pool(2);
+      cx::core::threading::thread_pool pool(2);
       std::atomic<bool> ran{false};
       pool.submit([&] { ran = true; });
 
@@ -36,7 +36,7 @@ struct thread_pool_test : public test_group {
       ctx.check(ran.load(), "the submitted task should have run");
     }},
     {"multiple submissions all run", [](test_context &ctx) {
-      cx::core::thread_pool pool(4);
+      cx::core::threading::thread_pool pool(4);
       constexpr int total = 20;
       std::atomic<int> count{0};
       for (int i = 0; i < total; ++i) {
@@ -49,7 +49,7 @@ struct thread_pool_test : public test_group {
       ctx.check_equal(count.load(), total);
     }},
     {"an exception thrown by one task does not break the worker or later submissions", [](test_context &ctx) {
-      cx::core::thread_pool pool(2);
+      cx::core::threading::thread_pool pool(2);
       pool.submit([] { throw std::runtime_error("boom"); });
 
       std::atomic<bool> ran{false};
@@ -61,10 +61,10 @@ struct thread_pool_test : public test_group {
       ctx.check(ran.load(), "a later submission should still run after a prior task threw");
     }},
     {"instance() returns the same reference across calls", [](test_context &ctx) {
-      ctx.check(&cx::core::thread_pool::instance() == &cx::core::thread_pool::instance(), "instance() should return the same reference across calls");
+      ctx.check(&cx::core::threading::thread_pool::instance() == &cx::core::threading::thread_pool::instance(), "instance() should return the same reference across calls");
     }},
     {"a free worker drains high before normal before low, regardless of submission order", [](test_context &ctx) {
-      cx::core::thread_pool pool(1);
+      cx::core::threading::thread_pool pool(1);
       std::mutex gate_mutex;
       std::condition_variable gate_cond;
       bool release = false;
@@ -90,9 +90,9 @@ struct thread_pool_test : public test_group {
 
       // Submitted low -> normal -> high: the worst case for plain FIFO, so
       // this only passes if priority - not submission order - wins.
-      pool.submit([&] { record("low"); }, cx::core::task_priority::low);
-      pool.submit([&] { record("normal"); }, cx::core::task_priority::normal);
-      pool.submit([&] { record("high"); }, cx::core::task_priority::high);
+      pool.submit([&] { record("low"); }, cx::core::threading::task_priority::low);
+      pool.submit([&] { record("normal"); }, cx::core::threading::task_priority::normal);
+      pool.submit([&] { record("high"); }, cx::core::threading::task_priority::high);
 
       {
         std::unique_lock lock(gate_mutex);
@@ -111,7 +111,7 @@ struct thread_pool_test : public test_group {
       }
     }},
     {"tasks submitted at the same priority level still run in FIFO order", [](test_context &ctx) {
-      cx::core::thread_pool pool(1);
+      cx::core::threading::thread_pool pool(1);
       std::mutex gate_mutex;
       std::condition_variable gate_cond;
       bool release = false;
@@ -135,7 +135,7 @@ struct thread_pool_test : public test_group {
               std::unique_lock lock(order_mutex);
               order.push_back(i);
             },
-            cx::core::task_priority::low);
+            cx::core::threading::task_priority::low);
       }
 
       {

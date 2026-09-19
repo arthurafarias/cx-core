@@ -8,8 +8,8 @@
 
 #pragma once
 
-#include <cxcore/testing/test_group.hpp>
-#include <cxcore/threading/task.hpp>
+#include <cx/core/testing/test_group.hpp>
+#include <cx/core/threading/task.hpp>
 
 #include <atomic>
 #include <chrono>
@@ -21,7 +21,7 @@ struct task_test : public test_group {
   task_test() : test_group("task", {
     {"start() runs the loop repeatedly on another thread until stop()", [](test_context &ctx) {
       std::atomic<int> count{0};
-      task t([&] {
+      threading::task t([&] {
         ++count;
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
       });
@@ -44,7 +44,7 @@ struct task_test : public test_group {
     }},
     {"pause() gates the loop before its next iteration, resume() releases it", [](test_context &ctx) {
       std::atomic<int> count{0};
-      task t([&] { ++count; });
+      threading::task t([&] { ++count; });
       t.start();
 
       for (int i = 0; i < 200 && count.load() < 1; ++i) {
@@ -69,7 +69,7 @@ struct task_test : public test_group {
     {"the destructor stops the loop without hanging", [](test_context &ctx) {
       std::atomic<int> count{0};
       {
-        task t([&] { ++count; });
+        threading::task t([&] { ++count; });
         t.start();
         std::this_thread::sleep_for(std::chrono::milliseconds(20));
       } // if the destructor failed to join, the test binary itself would hang here

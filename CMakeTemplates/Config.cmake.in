@@ -2,6 +2,7 @@
 
 include(CMakeFindDependencyMacro)
 find_dependency(Threads)
+@CXCORE_FIND_DEPENDENCIES@
 
 include("${CMAKE_CURRENT_LIST_DIR}/cxcoreTargets.cmake")
 set_and_check(cxcore_INCLUDE_DIR "${PACKAGE_PREFIX_DIR}/include")
