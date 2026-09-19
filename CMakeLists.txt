@@ -27,6 +27,7 @@ set(CXCORE_LIBRARIES
   cx-core-signals
   cx-core-events
   cx-core-containers
+  cx-core-io
 )
 
 foreach(library IN LISTS CXCORE_LIBRARIES)
