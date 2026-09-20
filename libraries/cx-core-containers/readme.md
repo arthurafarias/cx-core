@@ -8,6 +8,7 @@ Namespace `cx::core::containers`, headers under `cx/core/containers/`. Header-on
 
 - `variant.hpp`, `variant_map.hpp`, `map.hpp`
 - `object.hpp` — `property_set` / `property_get<T>`, `property_changed` signal
+- `buffer.hpp` — `buffer` (an owning `std::vector<std::byte>`), `make_buffer`, `to_string`, `append`: explicit byte/text conversions
 
 ## Depends on
 
