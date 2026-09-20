@@ -16,6 +16,7 @@
 //   C  async call returning a value   promise+future / coro::task
 //   D  asynchronous signal dispatch   signal::emit_async / async_signal::emit_async
 //   E  coroutine signal dispatch      a coroutine suspended on a signal emission
+//   F  fork-join over all cores       parallel_for against queue-shaped dispatch
 //
 // Within a section the first row is the baseline the `x` column is relative to.
 // Usage: cx-core-benchmark-dispatch [repetitions=9] [scale=1.0]
@@ -30,6 +31,7 @@
 #include <deque>
 #include <functional>
 #include <future>
+#include <latch>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -43,6 +45,7 @@
 #include <cx/core/threading/coro/task.hpp>
 #include <cx/core/threading/coroutine_executor.hpp>
 #include <cx/core/threading/future.hpp>
+#include <cx/core/threading/parallel_for.hpp>
 #include <cx/core/threading/thread_pool.hpp>
 
 namespace {
@@ -520,6 +523,86 @@ void coroutine_signal_dispatch() {
   });
 }
 
+// --- F ---------------------------------------------------------------------
+
+void burn(long iterations) {
+  volatile double x = 1.0;
+  for (long i = 0; i < iterations; ++i) x = x * 1.0000001 + 1e-9;
+}
+
+// A chunk as a coroutine that hops onto the pool: multicore dispatch through
+// the coroutine vocabulary (resume_on), one frame and one queue entry a chunk.
+struct detached {
+  struct promise_type {
+    detached get_return_object() { return {}; }
+    std::suspend_never initial_suspend() noexcept { return {}; }
+    std::suspend_never final_suspend() noexcept { return {}; }
+    void return_void() {}
+    void unhandled_exception() { std::abort(); }
+  };
+};
+detached chunk_on(std::shared_ptr<threading::thread_pool> pool, long iterations, std::latch &done) {
+  co_await coro::resume_on(pool);
+  burn(iterations);
+  done.count_down();
+}
+
+// The shape of a compute kernel: cut a range into 4 chunks a thread, run them
+// on every core, return when the last is done. ns/op is one whole fork-join.
+void fork_join(long iterations, const char *label) {
+  const std::size_t threads = threading::fork_join_pool::thread_count();
+  const std::size_t chunks = threads * threading::slices_per_thread;
+  const std::string title = "F  fork-join, " + std::to_string(chunks) + " chunks of " + label + " on " +
+                            std::to_string(threads) + " threads, per fork-join";
+  section(title.c_str());
+  const std::size_t ops = iterations >= 30000 ? 500 : 5000;
+  auto pool = threading::thread_pool::create(static_cast<unsigned>(threads));
+
+  measure("     serial loop (no dispatch)", ops, [&](std::size_t n) {
+    for (std::size_t i = 0; i < n; ++i)
+      for (std::size_t t = 0; t < chunks; ++t) burn(iterations);
+  });
+  measure("stl  std::jthread per chunk, joined", std::max<std::size_t>(ops / 50, 20), [&](std::size_t n) {
+    for (std::size_t i = 0; i < n; ++i) {
+      std::vector<std::jthread> workers;
+      for (std::size_t t = 0; t < chunks; ++t) workers.emplace_back([&] { burn(iterations); });
+    }
+  });
+  measure("cx   thread_pool::submit per chunk + std::latch", ops, [&](std::size_t n) {
+    for (std::size_t i = 0; i < n; ++i) {
+      std::latch done(static_cast<std::ptrdiff_t>(chunks));
+      for (std::size_t t = 0; t < chunks; ++t) pool->submit([&] { burn(iterations); done.count_down(); });
+      done.wait();
+    }
+  });
+  measure("cx   coroutine per chunk, resume_on(thread_pool)", ops, [&](std::size_t n) {
+    for (std::size_t i = 0; i < n; ++i) {
+      std::latch done(static_cast<std::ptrdiff_t>(chunks));
+      for (std::size_t t = 0; t < chunks; ++t) chunk_on(pool, iterations, done);
+      done.wait();
+    }
+  });
+  {
+    signals::signal<long> sig;
+    std::latch *current = nullptr;
+    for (std::size_t t = 0; t < chunks; ++t) sig.connect([&](long it) { burn(it); current->count_down(); });
+    measure("cx   signal::emit_async(thread_pool), a slot per chunk", ops, [&](std::size_t n) {
+      for (std::size_t i = 0; i < n; ++i) {
+        std::latch done(static_cast<std::ptrdiff_t>(chunks));
+        current = &done;
+        sig.emit_async(*pool, iterations);
+        done.wait();
+      }
+    });
+  }
+  measure("cx   threading::parallel_for", ops, [&](std::size_t n) {
+    for (std::size_t i = 0; i < n; ++i)
+      threading::parallel_for(chunks, 1, [&](std::size_t begin, std::size_t end) {
+        for (std::size_t t = begin; t < end; ++t) burn(iterations);
+      });
+  });
+}
+
 } // namespace
 
 int main(int argc, char **argv) {
@@ -536,6 +619,9 @@ int main(int argc, char **argv) {
   asynchronous_signal_dispatch(1);
   asynchronous_signal_dispatch(8);
   coroutine_signal_dispatch();
+  fork_join(300, "~0.6 us");
+  fork_join(3000, "~7 us");
+  fork_join(30000, "~70 us");
 
   std::printf("\nchecksum %llu\n", static_cast<unsigned long long>(sink.load()));
   return 0;
