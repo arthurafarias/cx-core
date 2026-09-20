@@ -50,6 +50,9 @@ inline test_group serialization_tests{
            serialization::write_xml_escaped(xml, "<a & \"b\">");
            serialization::write_csv_field(csv, "x,\"y\"");
            ctx.check(json.str() == "a\\\"b\\\\c\\nd", "json escapes quote, backslash and newline");
+           ctx.check(serialization::json_escaped(std::string_view{"a\x01\x1f\0z", 5}) == "a\\u0001\\u001f\\u0000z",
+                     "json escapes every control character, which RFC 8259 forbids raw");
+           ctx.check(serialization::json_escaped("\xc3\xa9\x7f") == "\xc3\xa9\x7f", "json leaves UTF-8 and DEL alone");
            ctx.check(xml.str().find('<') == std::string::npos && xml.str().find("&amp;") != std::string::npos,
                      "xml replaces markup characters with entities");
            ctx.check(csv.str() == "\"x,\"\"y\"\"\"", "csv quotes the field and doubles embedded quotes");

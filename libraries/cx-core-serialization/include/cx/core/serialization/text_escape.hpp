@@ -14,11 +14,16 @@
 
 #include <format>
 #include <ostream>
+#include <sstream>
 #include <string>
+#include <string_view>
 
 namespace cx::core::serialization {
 
-inline void write_json_escaped(std::ostream &out, const std::string &text) {
+// RFC 8259 §7: quote, backslash and every control character below U+0020 must
+// be escaped; a raw one makes the document unparseable. Bytes from 0x80 up are
+// UTF-8 and pass through.
+inline void write_json_escaped(std::ostream &out, std::string_view text) {
   for (char c : text) {
     switch (c) {
     case '"':
@@ -37,9 +42,20 @@ inline void write_json_escaped(std::ostream &out, const std::string &text) {
       out << "\\t";
       break;
     default:
-      out << c;
+      if (static_cast<unsigned char>(c) < 0x20) {
+        out << std::format("\\u{:04x}", static_cast<unsigned>(c));
+      } else {
+        out << c;
+      }
     }
   }
+}
+
+// The escaped copy itself, for a caller assembling a line rather than streaming one.
+inline std::string json_escaped(std::string_view text) {
+  std::ostringstream out;
+  write_json_escaped(out, text);
+  return std::move(out).str();
 }
 
 inline void write_xml_escaped(std::ostream &out, const std::string &text) {
