@@ -31,6 +31,8 @@ set(CXCORE_LIBRARIES
   cx-core-serialization
   cx-core-log
   cx-core-patterns
+  cx-core-filesystem
+  cx-core-process
 )
 
 foreach(library IN LISTS CXCORE_LIBRARIES)
