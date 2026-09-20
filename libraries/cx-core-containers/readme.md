@@ -11,6 +11,10 @@ Namespace `cx::core::containers`, headers under `cx/core/containers/`. Header-on
 - `variant_map.hpp`, `map.hpp`, `variant_array.hpp`
 - `property.hpp` — `property` (a variant with `name`, `option`, `description`) and `property_map`: a document of named,
   described values, as agenticx-ncortex's `ncortex.yaml` and command line are
+- `yaml.hpp` — `variant`, `property` and `property_map` to and from `serialization::yaml`: `render` (block), `flow`
+  (one line), `decode`, `decode_properties`; each alternative reads back as itself
+- `arguments.hpp` — a property map on a command line: `--property=<flow record>` tokens, typed `--<key>=<value>`
+  overrides applied atomically (`apply`), POSIX token splitting (`read`) and quoting
 - `object.hpp` — `property_set` / `property_get<T>`, `property_changed` signal
 - `buffer.hpp` — `buffer` (an owning `std::vector<std::byte>`), `make_buffer`, `to_string`, `append`: explicit byte/text conversions
 

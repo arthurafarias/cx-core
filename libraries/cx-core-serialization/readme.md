@@ -8,6 +8,9 @@ Namespace `cx::core::serialization`, headers under `cx/core/serialization/`. Hea
 
 - `text_escape.hpp` — `write_json_escaped`, `write_xml_escaped`, `write_csv_field` (stream writers), `json_escaped`
 - `json.hpp` — `json::value` document tree, strict RFC 8259 `parse`, compact `dump`, `quote`
+- `yaml.hpp` — `yaml::value` document tree and one dependency-free reader/writer for every cx project: block and
+  one-line flow collections, quoted scalars, the core-schema tags (`!!float`, `!!str`, ...), `parse`, block `dump`,
+  one-line `flow`; anchors, block scalars and multi-document streams are refused with a line number
 - `tags.hpp` — `tags::v`, `tags::kv` and the object/array markers: what an `archive()` function hands an archiver
 - `base64.hpp` — `base64_encode` / `base64_decode` (RFC 4648)
 - `utf8.hpp` — `valid_utf8`, and an incremental `utf8_validator` for streamed input
