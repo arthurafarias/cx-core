@@ -41,6 +41,25 @@ struct object_test : public test_group {
       auto v = obj.property_get<std::uint64_t>("rate");
       ctx.check(v.has_value() && *v == 44100, "property_get() should return the value passed to property_set()");
     }},
+    {"a property set from a bare int reads back as int, int64_t, uint64_t or double", [](test_context &ctx) {
+      // A bare int used to land in the int64_t alternative; with `int` in the variant it lands there instead, and
+      // every reader written against the 64-bit alternatives still has to get its value.
+      containers::object obj;
+      obj.property_set("fd", 7);
+      ctx.check(obj.property_get<int>("fd").value_or(0) == 7, "the stored alternative is int");
+      ctx.check(obj.property_get<std::int64_t>("fd").value_or(0) == 7, "int widens to int64_t");
+      ctx.check(obj.property_get<std::uint64_t>("fd").value_or(0) == 7, "a non-negative int widens to uint64_t");
+      ctx.check(obj.property_get<double>("fd").value_or(0) == 7.0, "int widens to double");
+      obj.property_set("fd", -1);
+      ctx.check(obj.property_get<std::int64_t>("fd").value_or(0) == -1, "a negative int keeps its sign as int64_t");
+      bool threw = false;
+      try {
+        (void)obj.property_get<std::uint64_t>("fd");
+      } catch (const std::bad_variant_access &) {
+        threw = true;
+      }
+      ctx.check(threw, "a negative int is not silently wrapped into uint64_t");
+    }},
     {"property_set fires property_changed with the property name", [](test_context &ctx) {
       containers::object obj;
       std::vector<std::string> changed;
