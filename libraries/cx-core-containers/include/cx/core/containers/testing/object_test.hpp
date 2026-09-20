@@ -14,6 +14,8 @@
 #include <atomic>
 #include <cstdint>
 #include <limits>
+#include <memory>
+#include <optional>
 #include <string>
 #include <thread>
 #include <vector>
@@ -242,6 +244,59 @@ struct object_test : public test_group {
 
       stop.store(true);
       writer.join();
+    }},
+    {"a bound property tracks the source's live value, not a snapshot", [](test_context &ctx) {
+      auto source = std::make_shared<containers::object>();
+      source->property_set("bass-energy", 0.25);
+
+      containers::object target;
+      target.property_bind("zoom", source, "bass-energy");
+
+      ctx.check(target.property_get<double>("zoom") == std::optional{0.25},
+                 "the bound property should read the source's current value");
+
+      source->property_set("bass-energy", 0.9);
+      ctx.check(target.property_get<double>("zoom") == std::optional{0.9},
+                 "the bound property should follow a later change to the source, not the value at bind() time");
+    }},
+    {"an expired source resolves to nullopt, not a dangling reference", [](test_context &ctx) {
+      containers::object target;
+      {
+        auto source = std::make_shared<containers::object>();
+        source->property_set("bass-energy", 0.5);
+        target.property_bind("zoom", source, "bass-energy");
+      } // source destroyed here - only target's weak_ptr remains
+
+      ctx.check(!target.property_get<double>("zoom").has_value(),
+                 "an expired source should resolve to nullopt, the same as any other absent key");
+    }},
+    {"property_set() after property_bind() clears the binding (last write wins)", [](test_context &ctx) {
+      auto source = std::make_shared<containers::object>();
+      source->property_set("bass-energy", 0.25);
+
+      containers::object target;
+      target.property_bind("zoom", source, "bass-energy");
+      ctx.check(target.is_bound("zoom"), "zoom should be bound immediately after property_bind()");
+
+      target.property_set("zoom", 2.0);
+      ctx.check(!target.is_bound("zoom"), "an explicit property_set() should clear the prior binding");
+      ctx.check(target.property_get<double>("zoom") == std::optional{2.0},
+                 "the literal value from property_set() should be readable, not the old bound value");
+
+      source->property_set("bass-energy", 0.75); // should have no further effect on target's "zoom"
+      ctx.check(target.property_get<double>("zoom") == std::optional{2.0},
+                 "changing the old source after the binding was cleared should not affect the target");
+    }},
+    {"property_bind() applies the same int64/uint64/double coercion as a literal property_get()", [](test_context &ctx) {
+      auto source = std::make_shared<containers::object>();
+      source->property_set("count", std::int64_t{42}); // text-grammar-shaped: stored as int64_t
+
+      containers::object target;
+      target.property_bind("max-size-buffers", source, "count"); // target property is independently uint64_t-typed
+
+      ctx.check(target.property_get<std::uint64_t>("max-size-buffers") == std::optional<std::uint64_t>{42},
+                 "the existing int64_t->uint64_t coercion (property_get<ValueType>()'s own logic) should apply "
+                 "identically whether the value came from a literal or a resolved binding");
     }},
   }) {}
 };
