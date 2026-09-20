@@ -17,6 +17,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <variant>
 #include <vector>
 
@@ -34,6 +35,12 @@ using object = std::map<std::string, value, std::less<>>;
 
 struct value : std::variant<std::nullptr_t, bool, double, std::string, array, object> {
   using variant::variant;
+
+  // An integer is a JSON number: std::variant alone refuses int -> double as narrowing, which would leave
+  // `{"index", 0}` without a constructor. bool stays bool.
+  template <typename integer>
+    requires(std::is_integral_v<integer> && !std::is_same_v<integer, bool>)
+  value(integer number) : variant(static_cast<double>(number)) {}
 
   template <typename type> bool is() const { return std::holds_alternative<type>(*this); }
   template <typename type> const type &as() const { return std::get<type>(*this); }

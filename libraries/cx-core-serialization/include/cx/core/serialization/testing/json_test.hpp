@@ -34,6 +34,10 @@ inline test_group json_tests{
            const json::value document = json::parse(R"({"a":[1,2.5,true,null],"o":{"k":"v\n"}})");
            ctx.check(json::parse(json::dump(document)) == document, "dump then parse is the identity");
            ctx.check(json::quote("a\"b\n\x01") == "\"a\\\"b\\n\\u0001\"", "quote escapes quotes and control bytes");
+           const json::value built = json::object{{"index", 0}, {"big", 1LL << 40}, {"on", true}, {"name", "x"}, {"none", nullptr}};
+           ctx.check(built.number("index", -1) == 0.0 && built.number("big", 0) == 1099511627776.0 && built.flag("on", false),
+                     "an integer builds a number, a bool stays a bool");
+           ctx.check(json::dump(built) == R"({"big":1099511627776,"index":0,"name":"x","none":null,"on":true})", "and dumps as one");
          }},
         {"parse is strict: malformed documents throw", [](test_context &ctx) {
            namespace json = serialization::json;
