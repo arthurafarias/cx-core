@@ -28,6 +28,9 @@ set(CXCORE_LIBRARIES
   cx-core-events
   cx-core-containers
   cx-core-io
+  cx-core-serialization
+  cx-core-log
+  cx-core-patterns
 )
 
 foreach(library IN LISTS CXCORE_LIBRARIES)
