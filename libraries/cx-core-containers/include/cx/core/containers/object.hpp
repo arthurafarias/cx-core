@@ -169,6 +169,16 @@ public:
     if (!value) {
       return std::nullopt;
     }
+    // A bare int argument is stored as `int` (variant.hpp); it widens the same way.
+    if (const auto *plain = std::get_if<int>(&*value)) {
+      if constexpr (std::is_same_v<ValueType, std::int64_t> || std::is_same_v<ValueType, double>) {
+        return static_cast<ValueType>(*plain);
+      } else if constexpr (std::is_same_v<ValueType, std::uint64_t>) {
+        if (*plain >= 0) {
+          return static_cast<std::uint64_t>(*plain);
+        }
+      }
+    }
     if constexpr (std::is_same_v<ValueType, std::uint64_t>) {
       if (const auto *signed_v = std::get_if<std::int64_t>(&*value)) {
         if (*signed_v >= 0) {

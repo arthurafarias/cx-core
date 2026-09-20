@@ -6,13 +6,17 @@ Namespace `cx::core::containers`, headers under `cx/core/containers/`. Header-on
 
 ## Headers
 
-- `variant.hpp`, `variant_map.hpp`, `map.hpp`
+- `variant.hpp` — the closed-set value: `bool`, `int64_t`, `uint64_t`, `double`, `string`, list, map, plus `int` and
+  null (agenticx-ncortex's document alternatives); `as<T>()`, `is<T>()`, `operator[]`, `visit_all`, `archive()`
+- `variant_map.hpp`, `map.hpp`, `variant_array.hpp`
+- `property.hpp` — `property` (a variant with `name`, `option`, `description`) and `property_map`: a document of named,
+  described values, as agenticx-ncortex's `ncortex.yaml` and command line are
 - `object.hpp` — `property_set` / `property_get<T>`, `property_changed` signal
 - `buffer.hpp` — `buffer` (an owning `std::vector<std::byte>`), `make_buffer`, `to_string`, `append`: explicit byte/text conversions
 
 ## Depends on
 
-cx-core-signals.
+cx-core-signals, cx-core-serialization (the archive tags).
 
 ## Using it
 

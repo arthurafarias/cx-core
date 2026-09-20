@@ -24,6 +24,18 @@ inline test_group process_tests{
            ctx.check(!process::which("cx-core-no-such-binary").has_value(), "an unknown name should resolve to nothing");
            ctx.check(process::which(sh->string()) == sh, "a name with a slash is checked as given");
          }},
+        {"search_directories() starts beside this binary; find_sibling() finds what is there", [](test_context &ctx) {
+           const auto own = process::own_directory();
+           ctx.require(!own.empty(), "/proc/self/exe should resolve");
+           const auto directories = process::search_directories();
+           ctx.require(!directories.empty() && directories.front() == own, "the binary's own directory is searched first");
+           for (const auto &directory : directories)
+             ctx.check(!directory.empty(), "an empty PATH entry is skipped, not read as the current directory");
+           const auto self = std::filesystem::read_symlink("/proc/self/exe");
+           ctx.check(process::find_sibling(self.filename().string()) == self, "this test binary is its own sibling");
+           ctx.check(process::find_sibling("cx-core-no-such-binary").empty(), "an unknown name resolves to nothing");
+           ctx.check(process::executable(self) && !process::executable(own), "a directory is not an executable");
+         }},
         {"run() returns the child's exit code", [](test_context &ctx) {
            ctx.check(process::run("/bin/sh", {"sh", "-c", "exit 7"}) == 7, "an exit code should come back as is");
            ctx.check(process::run("/bin/sh", {"sh", "-c", "kill -TERM $$"}) == 128 + 15, "a signal death should be 128 + signal");

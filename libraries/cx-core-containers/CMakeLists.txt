@@ -11,4 +11,4 @@ project(cx-core-containers VERSION 0.2.0 LANGUAGES CXX)
 
 include(${CMAKE_CURRENT_LIST_DIR}/../../cmake/cx_core_library.cmake)
 
-cx_core_library(DEPENDS cx-core-signals)
+cx_core_library(DEPENDS cx-core-signals cx-core-serialization)

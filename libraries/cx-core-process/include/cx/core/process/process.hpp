@@ -144,13 +144,59 @@ inline captured run_captured(const std::string &binary, std::vector<std::string>
   return result;
 }
 
+// A regular file this process may execute.
+inline bool executable(const std::filesystem::path &file) {
+  std::error_code ignored;
+  return std::filesystem::is_regular_file(file, ignored) && ::access(file.c_str(), X_OK) == 0;
+}
+
+// Where the running binary lives; empty when /proc/self/exe cannot be read.
+inline std::filesystem::path own_directory() {
+  std::error_code failure;
+  const auto self = std::filesystem::read_symlink("/proc/self/exe", failure);
+  return failure ? std::filesystem::path{} : self.parent_path();
+}
+
+// Where a program looks for the executables that belong to it: beside its own
+// binary first, then every PATH entry. A build tree and an install prefix both
+// work without PATH naming either - the sibling-executable dispatch
+// agenticx-ncortex is built on, which this came from.
+inline std::vector<std::filesystem::path> search_directories() {
+  std::vector<std::filesystem::path> directories;
+  if (const auto own = own_directory(); !own.empty()) {
+    directories.push_back(own);
+  }
+  if (const char *path = std::getenv("PATH")) {
+    std::string_view rest = path;
+    while (true) {
+      const std::size_t colon = rest.find(':');
+      if (const std::string_view entry = rest.substr(0, colon); !entry.empty()) {
+        directories.emplace_back(entry);
+      }
+      if (colon == std::string_view::npos) {
+        break;
+      }
+      rest.remove_prefix(colon + 1);
+    }
+  }
+  return directories;
+}
+
+// The first directory of search_directories() holding an executable `name`;
+// empty when none does. `name` is used as given: a caller taking it from
+// untrusted input checks it names no path first.
+inline std::filesystem::path find_sibling(std::string_view name) {
+  for (const auto &directory : search_directories()) {
+    if (executable(directory / name)) {
+      return directory / name;
+    }
+  }
+  return {};
+}
+
 // The first executable regular file named `name` on PATH, as a shell would
 // resolve it; a name containing '/' is checked as given.
 inline std::optional<std::filesystem::path> which(std::string_view name) {
-  const auto executable = [](const std::filesystem::path &p) {
-    std::error_code ignored;
-    return std::filesystem::is_regular_file(p, ignored) && ::access(p.c_str(), X_OK) == 0;
-  };
   if (name.empty()) {
     return std::nullopt;
   }

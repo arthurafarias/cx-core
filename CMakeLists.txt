@@ -26,9 +26,9 @@ set(CXCORE_LIBRARIES
   cx-core-threading
   cx-core-signals
   cx-core-events
+  cx-core-serialization
   cx-core-containers
   cx-core-io
-  cx-core-serialization
   cx-core-log
   cx-core-patterns
   cx-core-filesystem

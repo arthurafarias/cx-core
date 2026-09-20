@@ -8,6 +8,8 @@ Namespace `cx::core::log`, headers under `cx/core/log/`. Header-only.
 
 - `journal.hpp` — `journal::info/warn/debug/error`, `level_set`, `set_serializer`, `emit_async`
 - `journal_entry.hpp`, `journal_stream.hpp`
+- `bunyan.hpp` — `bunyan::info() << "text" << bunyan::field("key", value)`: one Bunyan JSON line per record on
+  stderr, minimum level from `CX_LOG_LEVEL` or `configuration()`; what agenticx-ncortex's commands log with
 - `journal_serializer.hpp` — plain, JSON, XML and CSV serializers, selectable per `ostream`
 
 One journal per process: every library logging through it shares its level and sink.

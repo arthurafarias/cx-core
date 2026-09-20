@@ -7,7 +7,8 @@ Namespace `cx::core::process`, headers under `cx/core/process/`. Header-only.
 ## Headers
 
 - `process.hpp` — `run` (inherit stdio, return the exit status), `run_captured` (stdout and stderr drained
-  together with poll, so a child filling either pipe cannot deadlock it), `which`, `exit_status`
+  together with poll, so a child filling either pipe cannot deadlock it), `which`, `exit_status`; `executable`, `own_directory`,
+  `search_directories` and `find_sibling` (beside the running binary first, then `PATH`)
 
 `sandbox` is not provided: the isolation mechanism (namespaces, seccomp) is undecided.
 
