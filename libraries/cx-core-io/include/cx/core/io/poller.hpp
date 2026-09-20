@@ -31,7 +31,7 @@
 #if CX_CORE_BACKEND_POSIX
 #include <cx/core/io/impl/posix/poller.hpp>
 #elif CX_CORE_BACKEND_STANDALONE
-#error "core::poller: the standalone backend is not implemented yet (SRS-019 M3)"
+#error "cx::core::io::poller: the standalone backend is not implemented yet (SRS-019 M3)"
 #endif
 
 /// @ingroup core
@@ -80,6 +80,6 @@ static_assert(
       { backend::interrupt(s) };
       { backend::backend_name(cs) } -> std::convertible_to<std::string_view>;
     },
-    "selected core::poller backend is incomplete (SRS-019 §2.3)");
+    "selected cx::core::io::poller backend is incomplete (SRS-019 §2.3)");
 
 } // namespace cx::core::io::poller

@@ -30,7 +30,7 @@
 #if CX_CORE_BACKEND_POSIX
 #include <cx/core/io/impl/posix/descriptor.hpp>
 #elif CX_CORE_BACKEND_STANDALONE
-#error "core::descriptor: the standalone backend is not implemented yet (SRS-019 M3)"
+#error "cx::core::io::descriptor: the standalone backend is not implemented yet (SRS-019 M3)"
 #endif
 
 /// @ingroup core
@@ -48,7 +48,7 @@ using native_handle = backend::native_handle;
 using state = backend::state;
 /// @brief The backend's "no open handle" sentinel.
 inline constexpr native_handle invalid_handle = backend::invalid_handle;
-using core::would_block;
+using io::would_block;
 
 /// @brief Wrap an already-open handle.
 inline state adopt(native_handle h) { return backend::adopt(h); }
@@ -76,6 +76,6 @@ static_assert(
       { backend::valid(cs) } -> std::same_as<bool>;
       { backend::native(cs) } -> std::same_as<native_handle>;
     },
-    "selected core::descriptor backend is incomplete (SRS-019 §2.3)");
+    "selected cx::core::io::descriptor backend is incomplete (SRS-019 §2.3)");
 
 } // namespace cx::core::io::descriptor
