@@ -15,6 +15,7 @@
 #include <mutex>
 #include <ostream>
 #include <string>
+#include <sstream>
 #include <thread>
 #include <unordered_map>
 
@@ -43,7 +44,13 @@ inline std::string format_timestamp(const std::chrono::system_clock::time_point 
   return std::format("{:%FT%T}", std::chrono::floor<std::chrono::milliseconds>(timestamp));
 }
 
-inline std::string format_thread_id(const std::thread::id &id) { return std::format("{}", id); }
+// operator<< rather than std::format: formatter<thread::id> is C++23 and GCC 13
+// (the Zynq cross toolchain's) lacks it; the text is the same.
+inline std::string format_thread_id(const std::thread::id &id) {
+  std::ostringstream out;
+  out << id;
+  return out.str();
+}
 
 } // namespace detail
 
